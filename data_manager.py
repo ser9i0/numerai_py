@@ -12,9 +12,9 @@ import zipfile
 
 
 class DataManager:
-
     """Class with necessary methods for datafiles download, processing and managing
     """
+
     def __init__(self):
         cwd = os.path.abspath(os.path.dirname(sys.argv[0]))
         self.output_path = os.path.join(cwd, 'data')
@@ -32,14 +32,14 @@ class DataManager:
         try:
             remote_file = urllib2.urlopen(req)
         except urllib2.URLError as err:
-            print "... /!\ ERROR: Error downloading files. Connection reset by peer."
+            print "/!\ ERROR: Error downloading files. Connection reset by peer."
             raise err
 
         rf_total_size = int(remote_file.info().getheader('Content-Length').strip())
         rf_datetime = datetime.datetime(*remote_file.info().getdate('last-modified')[0:6])
         prefix = rf_datetime.strftime('%Y%m%d')
 
-        print "Checking last available datasets..."
+        print ":: Checking last available datasets..."
 
         local_file_path = glob.glob(os.path.join(self.output_path, '*_numerai_training_data.csv'))
 
@@ -48,17 +48,17 @@ class DataManager:
             lf_datetime = datetime.datetime.fromtimestamp(t)
 
             if rf_datetime <= lf_datetime:
-                print "Datasets are already up to date ({0}).".format(prefix)
+                print ":::: Datasets are already up to date ({0}).".format(prefix)
                 return False
 
         dataset_path = os.path.join(self.output_path,
                                     '{0}_dataset.zip'.format(prefix))
 
-        print "Downloading datasets ({0} bytes)...".format(rf_total_size)
+        print ":::: Downloading datasets ({0} bytes)...".format(rf_total_size)
 
         with open(dataset_path, 'wb') as dataset_file:
-            chunk = (rf_total_size/50)+1
-            sys.stdout.write("Progress")
+            chunk = (rf_total_size / 50) + 1
+            sys.stdout.write(":::: Progress")
             progress_count = 0
             while True:
                 buffer_data = remote_file.read(chunk)
@@ -86,14 +86,14 @@ class DataManager:
                     continue
 
                 target_name = prefix + '_' + filename
-                print "Extracting {0}".format(target_name)
+                print ":::: Extracting {0}".format(target_name)
 
                 zf.extract(element, self.output_path)
                 os.rename(os.path.join(self.output_path, element.filename),
                           os.path.join(self.output_path, target_name))
             zf.close()
             os.remove(dataset_path)
-            print "Datasets successfully updated!"
+            print ":::: Datasets successfully updated!"
             return True
 
     def check_datasets(self):
@@ -104,32 +104,30 @@ class DataManager:
          training_data -- (if exists) Training dataset after Adversary Validation process
          validation_data -- (if exists) Dataset for training validation
         """
-        data = {}
         training_file = glob.glob(os.path.join(self.output_path, '*_training_data.csv'))
         prediction_file = glob.glob(os.path.join(self.output_path, '*_tournament_data.csv'))
         training_data = glob.glob(os.path.join(self.output_path, 'training_data.csv'))
         validation_data = glob.glob(os.path.join(self.output_path, 'validation_data.csv'))
 
         if len(training_file) is 1:
-            data['training_file'] = training_file[0]
+            self.data['training_file'] = training_file[0]
         else:
             print "ERROR: Training data not found."
             return False
 
         if len(prediction_file) is 1:
-            data['prediction_file'] = prediction_file[0]
+            self.data['prediction_file'] = prediction_file[0]
         else:
             print "ERROR: Prediction data not found."
             return False
 
         if len(training_data) is 1:
-            data['training_data'] = training_data[0]
+            self.data['training_data'] = training_data[0]
 
         if len(validation_data) is 1:
-            data['validation_data'] = validation_data[0]
+            self.data['validation_data'] = validation_data[0]
 
-        self.data = data
-        return data
+        return True
 
     def adv_validation_sets(self):
         """Function for generating validation datasets using Adversary Validation technique.
@@ -137,6 +135,7 @@ class DataManager:
         to create a validation dataset. The other 80% is keeped as training data.
         Both datasets are also stored in 'data' dictionary as training_data and validation_data.
         """
+        print ":: Creating validation datasets..."
         """Read original datasets"""
         df_train = pd.read_csv(self.data['training_file'])
         df_test = pd.read_csv(self.data['prediction_file'])
@@ -158,10 +157,10 @@ class DataManager:
         seed = 2380961743
         random_forest = RandomForestClassifier(n_estimators=100, n_jobs=-1, random_state=seed)
         predictions = np.zeros(y_subset.shape)
-
-        kfold = StratifiedKFold(y_subset, n_folds=5, shuffle=True, random_state=seed)
+        n_folds = 5
+        kfold = StratifiedKFold(y_subset, n_folds=n_folds, shuffle=True, random_state=seed)
         for i, (train_i, test_i) in enumerate(kfold):
-            print "Fold #{0}".format(i + 1)
+            print ":::: Fold {0}/{1}:".format((i + 1), n_folds)
 
             x_subset_train = x_subset.iloc[train_i]
             y_subset_train = y_subset.iloc[train_i]
@@ -173,7 +172,7 @@ class DataManager:
 
             p = random_forest.predict_proba(x_subset_test)[:, 1]
             auc = roc_auc_score(y_subset_test, p)
-            print "AUC: {:.2f}".format(auc)
+            print ":::: - AUC: {:.2f}".format(auc)
 
             predictions[test_i] = p
 
@@ -186,7 +185,8 @@ class DataManager:
         for n in range(0, len(predictions)):
             if predictions[n] > 0.5 and df_data[test_col].iloc[n] == 0:
                 trainingp50 += 1
-        print "Total number of {0} training elements are classified as test elements with p>0.5.".format(trainingp50)
+        print ":::: Total number of {0} training elements are classified as test elements with p>0.5.".format(
+            trainingp50)
 
         """Sort data by prediction confidence"""
         df_sorted = df_data.iloc[i]
@@ -198,13 +198,13 @@ class DataManager:
         df_train_sorted = df_train_sorted.drop(test_col, axis=1)
 
         """Verify training data"""
-        assert(df_train_sorted[target_col].sum() == df_train[target_col].sum())
+        assert (df_train_sorted[target_col].sum() == df_train[target_col].sum())
 
         """Grab first 20% rows as train and last 20% rows as validation (those closest to test)"""
         validation_size = int(len(df_train_sorted) * 0.2)
         df_train = df_train_sorted.iloc[:-validation_size]
         df_valid = df_train_sorted.iloc[-validation_size:]
-        print "Creating dataset with validation size: {0}".format(validation_size)
+        print ":::: Creating dataset with validation size: {0}".format(validation_size)
 
         training_file_path = os.path.join(self.output_path, 'training_data.csv')
         validation_file_path = os.path.join(self.output_path, 'validation_data.csv')
@@ -212,4 +212,16 @@ class DataManager:
         df_valid.to_csv(validation_file_path, index_label=False)
         self.data['training_data'] = training_file_path
         self.data['validation_data'] = validation_file_path
-        print "Done"
+        print ":::: Done"
+
+    def write_tournament_data(self, model):
+        df_prediction = pd.read_csv(self.data['prediction_file'])
+        df_tournament = df_prediction[['t_id']]
+        df_prediction = df_prediction.drop('t_id', axis=1)
+        print ":: Calculating predictions for tournament data..."
+        pred_prob = model.predict_proba(df_prediction)
+        df_tournament['probability'] = pd.Series(pred_prob[:, 1], index=df_tournament.index)
+        print ":: Saving prediction probabilities into file..."
+        tournament_file_path = os.path.join(self.output_path, 'tournament_data.csv')
+        df_tournament.to_csv(tournament_file_path, header=['t_id', 'probability'], index=False, index_label=False)
+        print ":: Done."
