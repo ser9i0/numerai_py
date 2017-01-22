@@ -218,19 +218,15 @@ class DataManager:
         self.data['validation_data'] = validation_file_path
         print ":::: Done"
 
-    def write_tournament_data(self, model):
+    def write_tournament_data(self, pred_prob, model):
         t_id = 't_id'
-        if 'reduced_features' in self.data:
-            feature_cols = self.data['reduced_features'] + [t_id]
-        else:
-            feature_cols = None
-        df_prediction = pd.read_csv(self.data['tournament_file'], usecols=feature_cols, float_precision='high')
-        df_tournament = df_prediction[[t_id]]
-        df_prediction = df_prediction.drop(t_id, axis=1)
-        print ":: Calculating predictions for tournament data..."
-        pred_prob = model.predict_proba(df_prediction)
-        df_tournament['probability'] = pd.Series(pred_prob[:, 1], index=df_tournament.index)
-        print ":: Saving prediction probabilities into file..."
-        tournament_file_path = os.path.join(self.output_path, 'tournament_data.csv')
+        # df_prediction = pd.read_csv(self.data['tournament_file'], usecols=feature_cols, float_precision='high')
+        # df_tournament = df_prediction[[t_id]]
+        df_tournament = pd.read_csv(self.data['tournament_file'], usecols=[t_id], float_precision='high')
+        # df_prediction = df_prediction.drop(t_id, axis=1)
+        # print ":: Calculating predictions for tournament data..."
+        df_tournament['probability'] = pd.Series(pred_prob, index=df_tournament.index)
+        print ":: Saving prediction probabilities for model {0} into file...".format(model)
+        tournament_file_path = os.path.join(self.output_path, '{0}_tournament_data.csv'.format(model))
         df_tournament.to_csv(tournament_file_path, header=[t_id, 'probability'], index=False)
         print ":: Done."

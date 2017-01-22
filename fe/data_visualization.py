@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-#%matplotlib inline
+# %matplotlib inline
 
 
-# Anadir un fichero de estadisticas/analisis con las varianzas, correlaciones, etc.???
+# TODO - Set a file with statistics/analysis about data, such as variance, correlation, etc.
 
 class DV:
     def __init__(self, training_file):
@@ -41,7 +41,8 @@ class DV:
                     continue
                 corr_value = getattr(row, col)
                 if corr_value > threshold:
-                    print ":::: {0} and {1} are highly correlated (>{2}) with r = {3}".format(index, col, threshold, corr_value)
+                    print ":::: {0} and {1} are highly correlated (>{2}) with r = {3}".format(index, col,
+                                                                                              threshold, corr_value)
 
         sns.heatmap(correlations, square=True)
         fig = plt.gcf()

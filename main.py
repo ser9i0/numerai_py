@@ -23,12 +23,15 @@ if __name__ == '__main__':
     data_manager.data['reduced_features'] = dr.low_variance()
 
     ml = ML(data_manager.data)
-    model = ml.logistic_regression()
+    """Baseline model: Logistic Regression"""
+    lr_preds = ml.logistic_regression()
+    """XGBoost"""
+    xgb_preds = ml.xgboost()
 
-    data_manager.write_tournament_data(model)
+    data_manager.write_tournament_data(lr_preds, 'logreg')
+    data_manager.write_tournament_data(xgb_preds,'xgboost')
 
     dv = DV(data_manager.data['training_file'])
-    #dv.histograms()
-    #dv.correlation()
-    #dv.variance()
-
+    # dv.histograms()
+    # dv.correlation()
+    # dv.variance()
