@@ -38,6 +38,10 @@ class DataManager:
         rf_total_size = int(remote_file.info().getheader('Content-Length').strip())
         rf_datetime = datetime.datetime(*remote_file.info().getdate('last-modified')[0:6])
         prefix = rf_datetime.strftime('%Y%m%d')
+        self.output_path = os.path.join(self.output_path, prefix)
+
+        if not os.path.exists(self.output_path):
+            os.makedirs(self.output_path)
 
         print ":: Checking last available datasets..."
 
@@ -73,7 +77,7 @@ class DataManager:
             sys.stdout.write("100%!\r\n")
             dataset_file.close()
 
-        """Remove old files"""
+        """Remove any csv file (folder should be empty)"""
         filelist = glob.glob(os.path.join(self.output_path, '*.csv'))
         for f in filelist:
             os.remove(f)
@@ -82,7 +86,7 @@ class DataManager:
             for element in zf.infolist():
                 filename = os.path.split(element.filename)[1]
 
-                if '._' in filename or 'csv' not in filename:
+                if '._' in filename or '_data.csv' not in filename:
                     continue
 
                 target_name = prefix + '_' + filename
@@ -100,12 +104,12 @@ class DataManager:
         """Function for cheking whether expected datafiles actually exist
         Returns a dictionary with the following elements:
          training_file -- Training dataset without any preprocessing
-         prediction_file -- Dataset with the tournament data to be predicted and uploaded
+         tournament_file -- Dataset with the tournament data to be predicted and uploaded
          training_data -- (if exists) Training dataset after Adversary Validation process
          validation_data -- (if exists) Dataset for training validation
         """
-        training_file = glob.glob(os.path.join(self.output_path, '*_training_data.csv'))
-        prediction_file = glob.glob(os.path.join(self.output_path, '*_tournament_data.csv'))
+        training_file = glob.glob(os.path.join(self.output_path, '*_numerai_training_data.csv'))
+        tournament_file = glob.glob(os.path.join(self.output_path, '*_numerai_tournament_data.csv'))
         training_data = glob.glob(os.path.join(self.output_path, 'training_data.csv'))
         validation_data = glob.glob(os.path.join(self.output_path, 'validation_data.csv'))
 
@@ -115,8 +119,8 @@ class DataManager:
             print "ERROR: Training data not found."
             return False
 
-        if len(prediction_file) is 1:
-            self.data['prediction_file'] = prediction_file[0]
+        if len(tournament_file) is 1:
+            self.data['tournament_file'] = tournament_file[0]
         else:
             print "ERROR: Prediction data not found."
             return False
@@ -137,12 +141,12 @@ class DataManager:
         """
         print ":: Creating validation datasets..."
         """Read original datasets"""
-        df_train = pd.read_csv(self.data['training_file'])
-        df_test = pd.read_csv(self.data['prediction_file'])
+        df_train = pd.read_csv(self.data['training_file'], float_precision='high')
+        df_test = pd.read_csv(self.data['tournament_file'], float_precision='high')
 
-        """All columns except target column"""
-        target_col = 'target'
-        feature_cols = list(df_train.ix[:, df_train.columns != target_col].columns.values)
+        """Select all columns except last column (target)"""
+        feature_cols = list(df_train.columns[:-1])
+        target_col = df_train.columns[-1]
         """Add new column TEST to differenciate train from test data"""
         test_col = 'TEST'
         df_train[test_col] = 0
@@ -200,7 +204,7 @@ class DataManager:
         """Verify training data"""
         assert (df_train_sorted[target_col].sum() == df_train[target_col].sum())
 
-        """Grab first 20% rows as train and last 20% rows as validation (those closest to test)"""
+        """Grab first 80% rows as train and last 20% rows as validation (those closest to test)"""
         validation_size = int(len(df_train_sorted) * 0.2)
         df_train = df_train_sorted.iloc[:-validation_size]
         df_valid = df_train_sorted.iloc[-validation_size:]
@@ -208,20 +212,25 @@ class DataManager:
 
         training_file_path = os.path.join(self.output_path, 'training_data.csv')
         validation_file_path = os.path.join(self.output_path, 'validation_data.csv')
-        df_train.to_csv(training_file_path, index_label=False)
-        df_valid.to_csv(validation_file_path, index_label=False)
+        df_train.to_csv(training_file_path, index=False, float_format='%.15f')
+        df_valid.to_csv(validation_file_path, index=False, float_format='%.15f')
         self.data['training_data'] = training_file_path
         self.data['validation_data'] = validation_file_path
         print ":::: Done"
 
     def write_tournament_data(self, model):
-        df_prediction = pd.read_csv(self.data['prediction_file'])
-        df_tournament = df_prediction[['t_id']]
-        df_prediction = df_prediction.drop('t_id', axis=1)
+        t_id = 't_id'
+        if 'reduced_features' in self.data:
+            feature_cols = self.data['reduced_features'] + [t_id]
+        else:
+            feature_cols = None
+        df_prediction = pd.read_csv(self.data['tournament_file'], usecols=feature_cols, float_precision='high')
+        df_tournament = df_prediction[[t_id]]
+        df_prediction = df_prediction.drop(t_id, axis=1)
         print ":: Calculating predictions for tournament data..."
         pred_prob = model.predict_proba(df_prediction)
         df_tournament['probability'] = pd.Series(pred_prob[:, 1], index=df_tournament.index)
         print ":: Saving prediction probabilities into file..."
         tournament_file_path = os.path.join(self.output_path, 'tournament_data.csv')
-        df_tournament.to_csv(tournament_file_path, header=['t_id', 'probability'], index=False, index_label=False)
+        df_tournament.to_csv(tournament_file_path, header=[t_id, 'probability'], index=False)
         print ":: Done."

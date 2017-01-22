@@ -5,19 +5,23 @@ from sklearn.metrics import log_loss
 
 class ML:
     def __init__(self, data):
-        self.training_data = pd.read_csv(data['training_data'])
-        self.validation_data = pd.read_csv(data['validation_data'])
+        self.training_data = pd.read_csv(data['training_data'], float_precision='high')
+        self.validation_data = pd.read_csv(data['validation_data'], float_precision='high')
+        if 'reduced_features' in data:
+            self.feature_cols = data['reduced_features']
+        else:
+            self.feature_cols = list(self.training_data.columns[:-1])
 
-    def logistic_regression(self, save=False):
+    def logistic_regression(self):
         """Create and fit logistic regression model"""
         print ":: Baseline Model - Logistic Regression ::::"
-        """Select all columns except target column"""
-        target_col = 'target'
-        feature_cols = list(self.training_data.ix[:, self.training_data.columns != target_col].columns.values)
+        """Select all columns except last column (target)"""
 
-        df_features_train = self.training_data[feature_cols]
+        target_col = self.training_data.columns[-1]
+
+        df_features_train = self.training_data[self.feature_cols]
         df_target_train = self.training_data[target_col]
-        df_features_valid = self.validation_data[feature_cols]
+        df_features_valid = self.validation_data[self.feature_cols]
         df_target_valid = self.validation_data[target_col]
 
         print ":::: Training model with default settings..."
