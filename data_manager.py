@@ -183,8 +183,6 @@ class DataManager:
         """Sort predictions by value"""
         i = predictions.argsort()
 
-        # Estaria bien saber cuantos datos de tipo training se clasifican como tipo TEST con p>0.5
-        # Hay que filtrar por p>0.5 y coger los que sean TEST=0
         trainingp50 = 0
         for n in range(0, len(predictions)):
             if predictions[n] > 0.5 and df_data[test_col].iloc[n] == 0:
@@ -217,16 +215,3 @@ class DataManager:
         self.data['training_data'] = training_file_path
         self.data['validation_data'] = validation_file_path
         print ":::: Done"
-
-    def write_tournament_data(self, pred_prob, model):
-        t_id = 't_id'
-        # df_prediction = pd.read_csv(self.data['tournament_file'], usecols=feature_cols, float_precision='high')
-        # df_tournament = df_prediction[[t_id]]
-        df_tournament = pd.read_csv(self.data['tournament_file'], usecols=[t_id], float_precision='high')
-        # df_prediction = df_prediction.drop(t_id, axis=1)
-        # print ":: Calculating predictions for tournament data..."
-        df_tournament['probability'] = pd.Series(pred_prob, index=df_tournament.index)
-        print ":: Saving prediction probabilities for model {0} into file...".format(model)
-        tournament_file_path = os.path.join(self.output_path, '{0}_tournament_data.csv'.format(model))
-        df_tournament.to_csv(tournament_file_path, header=[t_id, 'probability'], index=False)
-        print ":: Done."

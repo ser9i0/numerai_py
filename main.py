@@ -1,9 +1,14 @@
+import numpy as np
 from sys import exit
 
 from data_manager import DataManager
-from ml.ml import ML
 from fe.data_visualization import DV
 from fe.dimension_reduction import DimensionReduction
+# Models
+from ml.ml import ML
+from ml.model_log_reg import LogReg
+from ml.model_xgboost import XGB
+
 
 if __name__ == '__main__':
 
@@ -22,14 +27,20 @@ if __name__ == '__main__':
     dr = DimensionReduction(data_manager.data['training_data'])
     data_manager.data['reduced_features'] = dr.low_variance()
 
-    ml = ML(data_manager.data)
     """Baseline model: Logistic Regression"""
-    lr_preds = ml.logistic_regression()
-    """XGBoost"""
-    xgb_preds = ml.xgboost()
+    log_reg = LogReg(data_manager.data, data_manager.output_path)
+    models = np.array([log_reg])
 
-    data_manager.write_tournament_data(lr_preds, 'logreg')
-    data_manager.write_tournament_data(xgb_preds,'xgboost')
+    """XGBoost"""
+    xgb = XGB(data_manager.data, data_manager.output_path)
+    models = np.append(models, [xgb])
+
+    """Train models"""
+    ml = ML(models)
+    ml.run()
+
+    # data_manager.write_tournament_data(lr_preds, 'logreg')
+    # data_manager.write_tournament_data(xgb_preds,'xgboost')
 
     dv = DV(data_manager.data['training_file'])
     # dv.histograms()
